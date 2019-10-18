@@ -4,7 +4,7 @@ namespace Modules\Membership\Http\Controllers\Api;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Modules\Membership\Entities\Address;
+use Modules\Membership\Transformers\AddressTransformer;
 use Modules\Membership\Http\Requests\CreateAddressRequest;
 use Modules\Membership\Http\Requests\UpdateAddressRequest;
 use Modules\Membership\Repositories\AddressRepository;
@@ -32,7 +32,7 @@ class AddressController extends BaseApiController
             //Request to Repository
             $dataEntity = $this->address->getItemsBy($params);
             //Response
-            $response = ["data" => EntityTranformer::collection($dataEntity)];
+            $response = ["data" => AddressTransformer::collection($dataEntity)];
             //If request pagination add meta-page
             $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
         } catch (\Exception $e) {
@@ -58,7 +58,7 @@ class AddressController extends BaseApiController
             //Break if no found item
             if (!$dataEntity) throw new Exception('Item not found', 204);
             //Response
-            $response = ["data" => new EntityTranformer($dataEntity)];
+            $response = ["data" => new AddressTransformer($dataEntity)];
             //If request pagination add meta-page
             $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
         } catch (\Exception $e) {
@@ -85,7 +85,7 @@ class AddressController extends BaseApiController
             //Create item
             $dataEntity = $this->address->create($data);
             //Response
-            $response = ["data" => new EntityTranformer($dataEntity)];
+            $response = ["data" => new AddressTransformer($dataEntity)];
             \DB::commit(); //Commit to Data Base
         } catch (\Exception $e) {
             \DB::rollback();//Rollback to Data Base
@@ -109,7 +109,7 @@ class AddressController extends BaseApiController
         try {
 
             $data = $request->input('attributes') ?? [];
-            $this->validateRequestApi(new CreateEntytiRequest($data));
+            $this->validateRequestApi(new UpdateAddressRequest($data));
             $params = $this->getParamsRequest($request);
             $dataEntity = $this->address->getItem($criteria, $params);
             $this->address->update($dataEntity, $data);

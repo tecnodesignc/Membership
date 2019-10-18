@@ -20,12 +20,12 @@ class CreateMembershipProfilesTable extends Migration
             $table->string('identification')->nullable();
             $table->timestamp('birthday')->nullable();
             $table->text('birthplace')->nullable();
-            $table->integer('study_id')->default(0);
-            $table->integer('profession_id')->default(0);
+            $table->integer('study_id')->unsigned()->default(0);
+            $table->integer('profession_id')->unsigned()->default(0);
             $table->integer('civil_status')->default(0);
-            $table->integer('spouse_id')->nullable();
+            $table->integer('spouse_id')->unsigned()->nullable();
             $table->timestamp('baptism_date')->nullable();
-            $table->integer('minister_id')->nullable();
+            $table->integer('minister_id')->unsigned()->nullable();
             $table->timestamp('holy_spirit_date')->nullable();
             $table->unique('identification');
             $table->foreign('profession_id')->references('id')->on('membership__professions')->onDelete('restrict');

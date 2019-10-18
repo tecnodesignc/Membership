@@ -32,6 +32,7 @@ return [
         'destroy' => 'membership::workstations.destroy resource',
     ],
     'membership.profiles' => [
+        'manage' => 'membership::profiles.list manage',
         'index' => 'membership::profiles.list resource',
         'create' => 'membership::profiles.create resource',
         'edit' => 'membership::profiles.edit resource',

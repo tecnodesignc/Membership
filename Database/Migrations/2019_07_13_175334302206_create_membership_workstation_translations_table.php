@@ -19,8 +19,8 @@ class CreateMembershipWorkstationTranslationsTable extends Migration
             $table->text('description')->nullable();
             $table->integer('workstation_id')->unsigned();
             $table->string('locale')->index();
-            $table->unique(['workstation_id', 'locale']);
-            $table->foreign('workstation_id')->references('id')->on('membership__workstations')->onDelete('cascade');
+            $table->unique(['workstation_id', 'locale'],'membership__workstation_trans_locale_unique\'');
+            $table->foreign('workstation_id','membership__workstation_trans_workstation')->references('id')->on('membership__workstations')->onDelete('cascade');
         });
     }
 
@@ -32,7 +32,7 @@ class CreateMembershipWorkstationTranslationsTable extends Migration
     public function down()
     {
         Schema::table('membership__workstation_translations', function (Blueprint $table) {
-            $table->dropForeign(['workstation_id']);
+            $table->dropForeign('membership__workstation_trans_workstation');
         });
         Schema::dropIfExists('membership__workstation_translations');
     }

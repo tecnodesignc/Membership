@@ -4,7 +4,7 @@ namespace Modules\Membership\Http\Controllers\Api;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Modules\Membership\Entities\District;
+use Modules\Membership\Transformers\DistrictTransformer;
 use Modules\Membership\Http\Requests\CreateDistrictRequest;
 use Modules\Membership\Http\Requests\UpdateDistrictRequest;
 use Modules\Membership\Repositories\DistrictRepository;
@@ -25,78 +25,165 @@ class DistrictController extends BaseApiController
     }
 
     /**
-     * Display a listing of the resource.
+     * GET ITEMS
      *
-     * @return Response
+     * @return mixed
      */
-    public function index()
+    public function index(Request $request)
     {
-        //$districts = $this->district->all();
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
 
-        return view('membership::admin.districts.index', compact(''));
+            //Request to Repository
+            $dataEntity = $this->district->getItemsBy($params);
+
+            //Response
+            $response = ["data" => DistrictTransformer::collection($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+             \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * GET A ITEM
      *
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function create()
+    public function show($criteria, Request $request)
     {
-        return view('membership::admin.districts.create');
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            //Request to Repository
+            $dataEntity = $this->district->getItem($criteria, $params);
+
+            //Break if no found item
+            if (!$dataEntity) throw new Exception('Item not found', 204);
+
+            //Response
+            $response = ["data" => new DistrictTransformer($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+             \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
+    }
+
+
+    /**
+     * CREATE A ITEM
+     *
+     * @param Request $request
+     * @return mixed
+     */
+    public function create(Request $request)
+    {
+        \DB::beginTransaction();
+        try {
+            $data = $request->input('attributes') ?? [];//Get data  
+            //Validate Request
+            $this->validateRequestApi(new CreateDistrictRequest($data));
+
+            //Create item
+            $dataEntity = $this->district->create($data);
+
+            //Response
+            $response = ["data" => new DistrictTransformer($dataEntity)];
+            \DB::commit(); //Commit to Data Base
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * UPDATE ITEM
      *
-     * @param  CreateDistrictRequest $request
-     * @return Response
+     * @param $criteria
+     * @param Request $request
+     * @return mixed
      */
-    public function store(CreateDistrictRequest $request)
+    public function update($criteria, Request $request)
     {
-        $this->district->create($request->all());
+        \DB::beginTransaction(); //DB Transaction
+        try {
+            //Get data
+            $data = $request->input('attributes') ?? [];//Get data
 
-        return redirect()->route('admin.membership.district.index')
-            ->withSuccess(trans('core::core.messages.resource created', ['name' => trans('membership::districts.title.districts')]));
+            //Validate Request
+            $this->validateRequestApi(new UpdateDistrictRequest($data));
+
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            $dataEntity = $this->district->getItem($criteria, $params);
+            $this->district->update($dataEntity, $data);
+
+
+            //Response
+            $response = ["data" => 'Item Updated'];
+            \DB::commit();//Commit to DataBase
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * DELETE A ITEM
      *
-     * @param  District $district
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function edit(District $district)
+    public function delete($criteria, Request $request)
     {
-        return view('membership::admin.districts.edit', compact('district'));
+        \DB::beginTransaction();
+        try {
+            //Get params
+            $params = $this->getParamsRequest($request);
+
+            $dataEntity = $this->district->getItem($criteria, $params);
+            $this->district->destroy($dataEntity);
+
+
+            //Response
+            $response = ["data" => "Item deleted"];
+            \DB::commit();//Commit to Data Base
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  District $district
-     * @param  UpdateDistrictRequest $request
-     * @return Response
-     */
-    public function update(District $district, UpdateDistrictRequest $request)
-    {
-        $this->district->update($district, $request->all());
-
-        return redirect()->route('admin.membership.district.index')
-            ->withSuccess(trans('core::core.messages.resource updated', ['name' => trans('membership::districts.title.districts')]));
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  District $district
-     * @return Response
-     */
-    public function destroy(District $district)
-    {
-        $this->district->destroy($district);
-
-        return redirect()->route('admin.membership.district.index')
-            ->withSuccess(trans('core::core.messages.resource deleted', ['name' => trans('membership::districts.title.districts')]));
-    }
 }

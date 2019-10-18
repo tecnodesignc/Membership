@@ -3,29 +3,29 @@
 use Illuminate\Routing\Router;
 /** @var Router $router */
 
-$router->group(['prefix' =>'/profiles'], function (Router $router) {
+$router->group(['prefix' =>'/committee'], function (Router $router) {
 
     $router->get('/', [
-        'as' =>'api.membership.profile.index',
-        'uses' => 'EntityController@index',
+        'as' =>'api.membership.committee.index',
+        'uses' => 'CommitteeController@index',
     ]);
     $router->get('/{criteria}', [
-        'as' => 'api.membership.profile.show',
-        'uses' => 'EntityController@show',
+        'as' => 'api.membership.committee.show',
+        'uses' => 'CommitteeController@show',
     ]);
     $router->post('/', [
-        'as' => 'api.membership.profile.create',
-        'uses' => 'EntityController@create',
+        'as' => 'api.membership.committee.create',
+        'uses' => 'CommitteeController@create',
         'middleware' => ['auth:api']
     ]);
     $router->put('/{criteria}', [
-        'as' => 'api.membership.profile.update',
-        'uses' => 'EntityController@update',
+        'as' => 'api.membership.committee.update',
+        'uses' => 'CommitteeController@update',
         'middleware' => ['auth:api']
     ]);
     $router->delete('/{criteria}', [
-        'as' =>'api.membership.profile.destroy',
-        'uses' => 'EntityController@destroy',
+        'as' =>'api.membership.committee.destroy',
+        'uses' => 'CommitteeController@destroy',
         'middleware' => ['auth:api']
     ]);
 

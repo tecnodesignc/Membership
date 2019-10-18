@@ -4,7 +4,7 @@ namespace Modules\Membership\Http\Controllers\Api;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Modules\Membership\Entities\Profession;
+use Modules\Membership\Transformers\ProfessionTransformer;
 use Modules\Membership\Http\Requests\CreateProfessionRequest;
 use Modules\Membership\Http\Requests\UpdateProfessionRequest;
 use Modules\Membership\Repositories\ProfessionRepository;
@@ -25,78 +25,163 @@ class ProfessionController extends BaseApiController
     }
 
     /**
-     * Display a listing of the resource.
+     * GET ITEMS
      *
-     * @return Response
+     * @return mixed
      */
-    public function index()
+    public function index(Request $request)
     {
-        //$professions = $this->profession->all();
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
 
-        return view('membership::admin.professions.index', compact(''));
+            //Request to Repository
+            $dataEntity = $this->profession->getItemsBy($params);
+
+            //Response
+            $response = ["data" => ProfessionTransformer::collection($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+             \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * GET A ITEM
      *
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function create()
+    public function show($criteria, Request $request)
     {
-        return view('membership::admin.professions.create');
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            //Request to Repository
+            $dataEntity = $this->profession->getItem($criteria, $params);
+
+            //Break if no found item
+            if (!$dataEntity) throw new Exception('Item not found', 204);
+
+            //Response
+            $response = ["data" => new ProfessionTransformer($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+             \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * CREATE A ITEM
      *
-     * @param  CreateProfessionRequest $request
-     * @return Response
+     * @param Request $request
+     * @return mixed
      */
-    public function store(CreateProfessionRequest $request)
+    public function create(Request $request)
     {
-        $this->profession->create($request->all());
+        \DB::beginTransaction();
+        try {
+            $data = $request->input('attributes') ?? [];//Get data  
+            //Validate Request
+            $this->validateRequestApi(new CreateProfessionRequest($data));
 
-        return redirect()->route('admin.membership.profession.index')
-            ->withSuccess(trans('core::core.messages.resource created', ['name' => trans('membership::professions.title.professions')]));
+            //Create item
+            $dataEntity = $this->profession->create($data);
+
+            //Response
+            $response = ["data" => new ProfessionTransformer($dataEntity)];
+            \DB::commit(); //Commit to Data Base
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * UPDATE ITEM
      *
-     * @param  Profession $profession
-     * @return Response
+     * @param $criteria
+     * @param Request $request
+     * @return mixed
      */
-    public function edit(Profession $profession)
+    public function update($criteria, Request $request)
     {
-        return view('membership::admin.professions.edit', compact('profession'));
+        \DB::beginTransaction(); //DB Transaction
+        try {
+            //Get data
+            $data = $request->input('attributes') ?? [];//Get data
+
+            //Validate Request
+            $this->validateRequestApi(new UpdateProfessionRequest($data));
+
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            $dataEntity = $this->profession->getItem($criteria, $params);
+            $this->profession->update($dataEntity, $data);
+
+
+            //Response
+            $response = ["data" => 'Item Updated'];
+            \DB::commit();//Commit to DataBase
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Update the specified resource in storage.
+     * DELETE A ITEM
      *
-     * @param  Profession $profession
-     * @param  UpdateProfessionRequest $request
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function update(Profession $profession, UpdateProfessionRequest $request)
+    public function delete($criteria, Request $request)
     {
-        $this->profession->update($profession, $request->all());
+        \DB::beginTransaction();
+        try {
+            //Get params
+            $params = $this->getParamsRequest($request);
 
-        return redirect()->route('admin.membership.profession.index')
-            ->withSuccess(trans('core::core.messages.resource updated', ['name' => trans('membership::professions.title.professions')]));
-    }
+            $dataEntity = $this->profession->getItem($criteria, $params);
+            $this->profession->destroy($dataEntity);
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  Profession $profession
-     * @return Response
-     */
-    public function destroy(Profession $profession)
-    {
-        $this->profession->destroy($profession);
 
-        return redirect()->route('admin.membership.profession.index')
-            ->withSuccess(trans('core::core.messages.resource deleted', ['name' => trans('membership::professions.title.professions')]));
+            //Response
+            $response = ["data" => "Item deleted"];
+            \DB::commit();//Commit to Data Base
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 }

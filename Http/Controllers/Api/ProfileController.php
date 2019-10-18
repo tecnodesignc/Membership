@@ -4,11 +4,12 @@ namespace Modules\Membership\Http\Controllers\Api;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Modules\Membership\Entities\Profile;
 use Modules\Membership\Http\Requests\CreateProfileRequest;
 use Modules\Membership\Http\Requests\UpdateProfileRequest;
 use Modules\Membership\Repositories\ProfileRepository;
-use Modules\Site\Http\Controllers\Api\BaseApiController;
+use Modules\Ihelpers\Http\Controllers\Api\BaseApiController;
+use Modules\Membership\Transformers\ProfileTransformer;
+
 
 class ProfileController extends BaseApiController
 {
@@ -25,78 +26,165 @@ class ProfileController extends BaseApiController
     }
 
     /**
-     * Display a listing of the resource.
+     * GET ITEMS
      *
-     * @return Response
+     * @return mixed
      */
-    public function index()
+    public function index(Request $request)
     {
-        //$profiles = $this->profile->all();
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
 
-        return view('membership::admin.profiles.index', compact(''));
+            //Request to Repository
+            $dataEntity = $this->profile->getItemsBy($params);
+
+            //Response
+            $response = ["data" => ProfileTransformer::collection($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+            \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
+    }
+
+
+    /**
+     * GET A ITEM
+     *
+     * @param $criteria
+     * @return mixed
+     */
+    public function show($criteria, Request $request)
+    {
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            //Request to Repository
+            $dataEntity = $this->profile->getItem($criteria, $params);
+
+            //Break if no found item
+            if (!$dataEntity) throw new Exception('Item not found', 204);
+
+            //Response
+            $response = ["data" => new ProfileTransformer($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+            \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * CREATE A ITEM
      *
-     * @return Response
+     * @param Request $request
+     * @return mixed
      */
-    public function create()
+    public function create(Request $request)
     {
-        return view('membership::admin.profiles.create');
+        \DB::beginTransaction();
+        try {
+            $data = $request->input('attributes') ?? [];//Get data  
+            //Validate Request
+            $this->validateRequestApi(new CreateProfileRequest($data));
+
+            //Create item
+            $dataEntity = $this->profile->create($data);
+
+            //Response
+            $response = ["data" => new ProfileTransformer($dataEntity)];
+            \DB::commit(); //Commit to Data Base
+        } catch (\Exception $e) {
+            \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * UPDATE ITEM
      *
-     * @param  CreateProfileRequest $request
-     * @return Response
+     * @param $criteria
+     * @param Request $request
+     * @return mixed
      */
-    public function store(CreateProfileRequest $request)
+    public function update($criteria, Request $request)
     {
-        $this->profile->create($request->all());
+        \DB::beginTransaction(); //DB Transaction
+        try {
+            //Get data
+            $data = $request->input('attributes') ?? [];//Get data
 
-        return redirect()->route('admin.membership.profile.index')
-            ->withSuccess(trans('core::core.messages.resource created', ['name' => trans('membership::profiles.title.profiles')]));
+            //Validate Request
+            $this->validateRequestApi(new UpdateProfileRequest($data));
+
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+
+            $dataEntity = $this->profile->getItem($criteria, $params);
+            $this->profile->update($dataEntity, $data);
+
+            //Response
+            $response = ["data" => 'Item Updated'];
+            \DB::commit();//Commit to DataBase
+        } catch (\Exception $e) {
+            \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * DELETE A ITEM
      *
-     * @param  Profile $profile
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function edit(Profile $profile)
+    public function delete($criteria, Request $request)
     {
-        return view('membership::admin.profiles.edit', compact('profile'));
-    }
+        \DB::beginTransaction();
+        try {
+            //Get params
+            $params = $this->getParamsRequest($request);
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  Profile $profile
-     * @param  UpdateProfileRequest $request
-     * @return Response
-     */
-    public function update(Profile $profile, UpdateProfileRequest $request)
-    {
-        $this->profile->update($profile, $request->all());
 
-        return redirect()->route('admin.membership.profile.index')
-            ->withSuccess(trans('core::core.messages.resource updated', ['name' => trans('membership::profiles.title.profiles')]));
-    }
+            $dataEntity = $this->profile->getItem($criteria, $params);
+            $this->profile->destroy($dataEntity);
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  Profile $profile
-     * @return Response
-     */
-    public function destroy(Profile $profile)
-    {
-        $this->profile->destroy($profile);
 
-        return redirect()->route('admin.membership.profile.index')
-            ->withSuccess(trans('core::core.messages.resource deleted', ['name' => trans('membership::profiles.title.profiles')]));
+            //Response
+            $response = ["data" => "Item deleted"];
+            \DB::commit();//Commit to Data Base
+        } catch (\Exception $e) {
+            \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 }

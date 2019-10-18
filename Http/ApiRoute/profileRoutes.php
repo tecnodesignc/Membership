@@ -7,25 +7,25 @@ $router->group(['prefix' =>'/profiles'], function (Router $router) {
 
     $router->get('/', [
         'as' =>'api.membership.profile.index',
-        'uses' => 'EntityController@index',
+        'uses' => 'ProfileController@index',
     ]);
     $router->get('/{criteria}', [
         'as' => 'api.membership.profile.show',
-        'uses' => 'EntityController@show',
+        'uses' => 'ProfileController@show',
     ]);
     $router->post('/', [
         'as' => 'api.membership.profile.create',
-        'uses' => 'EntityController@create',
+        'uses' => 'ProfileController@create',
         'middleware' => ['auth:api']
     ]);
     $router->put('/{criteria}', [
         'as' => 'api.membership.profile.update',
-        'uses' => 'EntityController@update',
+        'uses' => 'ProfileController@update',
         'middleware' => ['auth:api']
     ]);
     $router->delete('/{criteria}', [
         'as' =>'api.membership.profile.destroy',
-        'uses' => 'EntityController@destroy',
+        'uses' => 'ProfileController@destroy',
         'middleware' => ['auth:api']
     ]);
 

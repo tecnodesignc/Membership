@@ -3,29 +3,29 @@
 use Illuminate\Routing\Router;
 /** @var Router $router */
 
-$router->group(['prefix' =>'/profiles'], function (Router $router) {
+$router->group(['prefix' =>'/Professions'], function (Router $router) {
 
     $router->get('/', [
-        'as' =>'api.membership.profile.index',
-        'uses' => 'EntityController@index',
+        'as' =>'api.membership.profession.index',
+        'uses' => 'ProfessionController@index',
     ]);
     $router->get('/{criteria}', [
-        'as' => 'api.membership.profile.show',
-        'uses' => 'EntityController@show',
+        'as' => 'api.membership.profession.show',
+        'uses' => 'ProfessionController@show',
     ]);
     $router->post('/', [
-        'as' => 'api.membership.profile.create',
-        'uses' => 'EntityController@create',
+        'as' => 'api.membership.profession.create',
+        'uses' => 'ProfessionController@create',
         'middleware' => ['auth:api']
     ]);
     $router->put('/{criteria}', [
-        'as' => 'api.membership.profile.update',
-        'uses' => 'EntityController@update',
+        'as' => 'api.membership.profession.update',
+        'uses' => 'ProfessionController@update',
         'middleware' => ['auth:api']
     ]);
     $router->delete('/{criteria}', [
-        'as' =>'api.membership.profile.destroy',
-        'uses' => 'EntityController@destroy',
+        'as' =>'api.membership.profession.destroy',
+        'uses' => 'ProfessionController@destroy',
         'middleware' => ['auth:api']
     ]);
 

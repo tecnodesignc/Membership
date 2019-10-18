@@ -4,7 +4,7 @@ namespace Modules\Membership\Http\Controllers\Api;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Modules\Membership\Entities\Workstation;
+use Modules\Membership\Transformers\WorkstationTransformer;
 use Modules\Membership\Http\Requests\CreateWorkstationRequest;
 use Modules\Membership\Http\Requests\UpdateWorkstationRequest;
 use Modules\Membership\Repositories\WorkstationRepository;
@@ -25,78 +25,163 @@ class WorkstationController extends BaseApiController
     }
 
     /**
-     * Display a listing of the resource.
+     * GET ITEMS
      *
-     * @return Response
+     * @return mixed
      */
-    public function index()
+    public function index(Request $request)
     {
-        //$workstations = $this->workstation->all();
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
 
-        return view('membership::admin.workstations.index', compact(''));
+            //Request to Repository
+            $dataEntity = $this->workstation->getItemsBy($params);
+
+            //Response
+            $response = ["data" => WorkstationTransformer::collection($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+             \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * GET A ITEM
      *
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function create()
+    public function show($criteria, Request $request)
     {
-        return view('membership::admin.workstations.create');
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            //Request to Repository
+            $dataEntity = $this->workstation->getItem($criteria, $params);
+
+            //Break if no found item
+            if (!$dataEntity) throw new Exception('Item not found', 204);
+
+            //Response
+            $response = ["data" => new WorkstationTransformer($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+             \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * CREATE A ITEM
      *
-     * @param  CreateWorkstationRequest $request
-     * @return Response
+     * @param Request $request
+     * @return mixed
      */
-    public function store(CreateWorkstationRequest $request)
+    public function create(Request $request)
     {
-        $this->workstation->create($request->all());
+        \DB::beginTransaction();
+        try {
+            $data = $request->input('attributes') ?? [];//Get data
+            //Validate Request
+            $this->validateRequestApi(new CreateWorkstationRequest($data));
 
-        return redirect()->route('admin.membership.workstation.index')
-            ->withSuccess(trans('core::core.messages.resource created', ['name' => trans('membership::workstations.title.workstations')]));
+            //Create item
+            $dataEntity = $this->workstation->create($data);
+
+            //Response
+            $response = ["data" => new WorkstationTransformer($dataEntity)];
+            \DB::commit(); //Commit to Data Base
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * UPDATE ITEM
      *
-     * @param  Workstation $workstation
-     * @return Response
+     * @param $criteria
+     * @param Request $request
+     * @return mixed
      */
-    public function edit(Workstation $workstation)
+    public function update($criteria, Request $request)
     {
-        return view('membership::admin.workstations.edit', compact('workstation'));
+        \DB::beginTransaction(); //DB Transaction
+        try {
+            //Get data
+            $data = $request->input('attributes') ?? [];//Get data
+
+            //Validate Request
+            $this->validateRequestApi(new UpdateWorkstationRequest($data));
+
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            $dataEntity = $this->workstation->getItem($criteria, $params);
+            $this->workstation->update($dataEntity, $data);
+
+
+            //Response
+            $response = ["data" => 'Item Updated'];
+            \DB::commit();//Commit to DataBase
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Update the specified resource in storage.
+     * DELETE A ITEM
      *
-     * @param  Workstation $workstation
-     * @param  UpdateWorkstationRequest $request
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function update(Workstation $workstation, UpdateWorkstationRequest $request)
+    public function delete($criteria, Request $request)
     {
-        $this->workstation->update($workstation, $request->all());
+        \DB::beginTransaction();
+        try {
+            //Get params
+            $params = $this->getParamsRequest($request);
 
-        return redirect()->route('admin.membership.workstation.index')
-            ->withSuccess(trans('core::core.messages.resource updated', ['name' => trans('membership::workstations.title.workstations')]));
-    }
+            $dataEntity = $this->workstation->getItem($criteria, $params);
+            $this->workstation->destroy($dataEntity);
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  Workstation $workstation
-     * @return Response
-     */
-    public function destroy(Workstation $workstation)
-    {
-        $this->workstation->destroy($workstation);
 
-        return redirect()->route('admin.membership.workstation.index')
-            ->withSuccess(trans('core::core.messages.resource deleted', ['name' => trans('membership::workstations.title.workstations')]));
+            //Response
+            $response = ["data" => "Item deleted"];
+            \DB::commit();//Commit to Data Base
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 }

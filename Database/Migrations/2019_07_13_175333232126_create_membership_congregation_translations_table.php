@@ -20,8 +20,8 @@ class CreateMembershipCongregationTranslationsTable extends Migration
             $table->text('descrition')->nullable();
             $table->integer('congregation_id')->unsigned();
             $table->string('locale')->index();
-            $table->unique(['congregation_id', 'locale']);
-            $table->foreign('congregation_id')->references('id')->on('membership__congregations')->onDelete('cascade');
+            $table->unique(['congregation_id', 'locale'],'membership__congregation_trans_locale_unique');
+            $table->foreign('congregation_id','membership__congregation_trans_congregation')->references('id')->on('membership__congregations')->onDelete('cascade');
         });
     }
 
@@ -33,7 +33,7 @@ class CreateMembershipCongregationTranslationsTable extends Migration
     public function down()
     {
         Schema::table('membership__congregation_translations', function (Blueprint $table) {
-            $table->dropForeign(['congregation_id']);
+            $table->dropForeign('membership__congregation_trans_congregation');
         });
         Schema::dropIfExists('membership__congregation_translations');
     }

@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Marketplace\Transformers;
+namespace Modules\Membership\Transformers;
 
 use Illuminate\Http\Resources\Json\Resource;
 use Modules\User\Transformers\UserProfileTransformer;
@@ -16,7 +16,7 @@ class AddressTransformer extends Resource
         'lat' => $this->when($this->lat, $this->lat),
         'lng' => $this->when($this->lng, $this->lng),
         'phone' => $this->when($this->phone, $this->phone),
-        'users' => CategoryTransformer::collection($this->whenLoaded('users')),
+        'users' => UserProfileTransformer::collection($this->whenLoaded('users')),
         'congregations' => CategoryTransformer::collection($this->whenLoaded('congregations')),
     ];
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Marketplace\Transformers;
+namespace Modules\Membership\Transformers;
 
 use Illuminate\Http\Resources\Json\Resource;
 use Modules\User\Transformers\UserProfileTransformer;

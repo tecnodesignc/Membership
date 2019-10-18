@@ -4,7 +4,7 @@ namespace Modules\Membership\Http\Controllers\Api;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Modules\Membership\Entities\Congregation;
+use Modules\Membership\Transformers\CongregationTransformer;
 use Modules\Membership\Http\Requests\CreateCongregationRequest;
 use Modules\Membership\Http\Requests\UpdateCongregationRequest;
 use Modules\Membership\Repositories\CongregationRepository;
@@ -25,78 +25,162 @@ class CongregationController extends BaseApiController
     }
 
     /**
-     * Display a listing of the resource.
+     * GET ITEMS
      *
-     * @return Response
+     * @return mixed
      */
-    public function index()
+    public function index(Request $request)
     {
-        //$congregations = $this->congregation->all();
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
 
-        return view('membership::admin.congregations.index', compact(''));
+            //Request to Repository
+            $dataEntity = $this->congregation->getItemsBy($params);
+
+            //Response
+            $response = ["data" => CongregationTransformer::collection($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+             \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * GET A ITEM
      *
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function create()
+    public function show($criteria, Request $request)
     {
-        return view('membership::admin.congregations.create');
+        try {
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            //Request to Repository
+            $dataEntity = $this->congregation->getItem($criteria, $params);
+
+            //Break if no found item
+            if (!$dataEntity) throw new Exception('Item not found', 204);
+
+            //Response
+            $response = ["data" => new CongregationTransformer($dataEntity)];
+
+            //If request pagination add meta-page
+            $params->page ? $response["meta"] = ["page" => $this->pageTransformer($dataEntity)] : false;
+        } catch (\Exception $e) {
+             \Log::error($e);
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * CREATE A ITEM
      *
-     * @param  CreateCongregationRequest $request
-     * @return Response
+     * @param Request $request
+     * @return mixed
      */
-    public function store(CreateCongregationRequest $request)
+    public function create(Request $request)
     {
-        $this->congregation->create($request->all());
+        \DB::beginTransaction();
+        try {
+            $data = $request->input('attributes') ?? [];//Get data  
+            //Validate Request
+            $this->validateRequestApi(new CreateCongregationRequest($data));
 
-        return redirect()->route('admin.membership.congregation.index')
-            ->withSuccess(trans('core::core.messages.resource created', ['name' => trans('membership::congregations.title.congregations')]));
+            //Create item
+            $dataEntity = $this->congregation->create($data);
+
+            //Response
+            $response = ["data" => new CongregationTransformer($dataEntity)];
+            \DB::commit(); //Commit to Data Base
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * UPDATE ITEM
      *
-     * @param  Congregation $congregation
-     * @return Response
+     * @param $criteria
+     * @param Request $request
+     * @return mixed
      */
-    public function edit(Congregation $congregation)
+    public function update($criteria, Request $request)
     {
-        return view('membership::admin.congregations.edit', compact('congregation'));
+        \DB::beginTransaction(); //DB Transaction
+        try {
+            //Get data
+            $data = $request->input('attributes') ?? [];//Get data
+
+            //Validate Request
+            $this->validateRequestApi(new UpdateCongregationRequest($data));
+
+            //Get Parameters from URL.
+            $params = $this->getParamsRequest($request);
+
+            $dataEntity = $this->congregation->getItem($criteria, $params);
+            $this->congregation->update($dataEntity, $data);
+
+            //Response
+            $response = ["data" => 'Item Updated'];
+            \DB::commit();//Commit to DataBase
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 
     /**
-     * Update the specified resource in storage.
+     * DELETE A ITEM
      *
-     * @param  Congregation $congregation
-     * @param  UpdateCongregationRequest $request
-     * @return Response
+     * @param $criteria
+     * @return mixed
      */
-    public function update(Congregation $congregation, UpdateCongregationRequest $request)
+    public function delete($criteria, Request $request)
     {
-        $this->congregation->update($congregation, $request->all());
+        \DB::beginTransaction();
+        try {
+            //Get params
+            $params = $this->getParamsRequest($request);
 
-        return redirect()->route('admin.membership.congregation.index')
-            ->withSuccess(trans('core::core.messages.resource updated', ['name' => trans('membership::congregations.title.congregations')]));
-    }
+            $dataEntity = $this->congregation->getItem($criteria, $params);
+            $this->congregation->destroy($dataEntity);
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  Congregation $congregation
-     * @return Response
-     */
-    public function destroy(Congregation $congregation)
-    {
-        $this->congregation->destroy($congregation);
 
-        return redirect()->route('admin.membership.congregation.index')
-            ->withSuccess(trans('core::core.messages.resource deleted', ['name' => trans('membership::congregations.title.congregations')]));
+            //Response
+            $response = ["data" => "Item deleted"];
+            \DB::commit();//Commit to Data Base
+        } catch (\Exception $e) {
+             \Log::error($e);
+            \DB::rollback();//Rollback to Data Base
+            $status = $this->getStatusError($e->getCode());
+            $response = ["errors" => $e->getMessage()];
+        }
+
+        //Return response
+        return response()->json($response ?? ["data" => "Request successful"], $status ?? 200);
     }
 }

@@ -1,9 +1,9 @@
 <?php
 
-namespace Modules\Marketplace\Transformers;
+namespace Modules\Membership\Transformers;
 
 use Illuminate\Http\Resources\Json\Resource;
-use Modules\Marketplace\Services\StoreHistory;
+use Modules\Membership\Services\StoreHistory;
 use Modules\User\Transformers\UserProfileTransformer;
 use Illuminate\Support\Arr;
 
